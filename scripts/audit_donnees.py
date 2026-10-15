@@ -28,14 +28,20 @@ print("=" * 60)
 print(f"structure fichiers STATIONS : ",stations.shape)
 stations.info()
 nb_doublons_stations = stations.duplicated().sum()
-print(f"nb_doublons_stations", nb_doublons_stations)
+print(f"nb_doublons_stations : ", nb_doublons_stations)
 
 print("=" * 60)
 print(f"structure fichiers TRAJETS : ", trajets.shape)
 trajets.info()
 nb_doublons_trajets = trajets.duplicated().sum()
-print(f"nb_doublons_trajets", nb_doublons_trajets)
+print(f"nb_doublons_trajets : ", nb_doublons_trajets)
 
+nb_velo_id_minuscule = trajets.loc[
+        trajets["velo_id"].astype(str).str.startswith("v", na=False),
+        "velo_id"
+        ].sum()
+nb_velo_id_minuscule = trajets["velo_id"].astype(str).str.startswith("v", na=False).sum()
+print(f"nb_velo_id_minuscule : ",nb_velo_id_minuscule)
 
 #*************************************************************************
 # Fichier INCIDENTS

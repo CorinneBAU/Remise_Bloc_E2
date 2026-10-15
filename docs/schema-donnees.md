@@ -111,7 +111,8 @@ Contraintes :
 | Fichier | Défaut identifié | Règle | Nombre de lignes | Traitement retenu |
 |--------|-----------------|-------|-------------------|-------------------|
 |Incidents | statut en majuscule ou 'en cours" au lieu de 'en_cours'|RG7|125|Normalisation
-|Incidents |date_résolution < date_signalement|        RG8|3|Rejet
+|Incidents |date_résolution < date_signalement|RG8|3|Rejet 
+|Trajets|velo_id hétérogène |V + 4 chiffres|6|Normalisation
 |Trajets |durée <= 0|RG4|10|Rejet
 |Trajets |station arrivée inconnue|RG2|7|Rejet
 Trajets  |depart_horodatage avec format incorrect |Horodatage AAAA-MM-JJ HH:MM:SS|5|Normalisation
