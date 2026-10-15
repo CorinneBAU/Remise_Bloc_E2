@@ -13,8 +13,8 @@ DROP TABLE IF EXISTS utilisateur;
 -- ---------------------------------------------------------------
 CREATE TABLE station (
     station_id VARCHAR(10) PRIMARY KEY,
-    nom VARCHAR(30),
-    commune VARCHAR(30),
+    nom VARCHAR(100),
+    commune VARCHAR(100),
     capacite INTEGER 
         CHECK (capacite > 0),
     latitude NUMERIC(8,5),

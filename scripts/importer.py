@@ -8,10 +8,42 @@ base dans le même état.
 
 Usage prévu : python scripts/importer.py [--dossier data]
 """
-
+import pandas as pd
+from api.database import SessionLocal
+from api.models import Station
 
 def main() -> None:
-    raise NotImplementedError("À compléter")
+    stations = pd.read_csv("./data/stations.csv")
+    # trajets = pd.read_csv("./data/trajets.csv")
+    # incidents = pd.read_csv("./data/incidents.csv")
+
+    db = SessionLocal()
+    try:
+
+        print(f"Stations lues : {len(stations)}")
+
+        for ligne in stations.to_dict("records"):
+
+            station = Station(
+                station_id=ligne["station_id"],
+                nom=ligne["nom"],
+                commune=ligne["commune"],
+                capacite=ligne["capacite"],
+                latitude=ligne["latitude"],
+                longitude=ligne["longitude"],
+                date_mise_en_service=ligne["date_mise_en_service"],
+            )
+
+            db.add(station)
+
+        db.commit()
+
+        print("Import stations terminé")
+
+    finally:
+        db.close()
+
+    # raise NotImplementedError("À compléter")
 
 
 if __name__ == "__main__":

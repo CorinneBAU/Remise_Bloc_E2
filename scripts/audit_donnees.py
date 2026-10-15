@@ -153,3 +153,5 @@ date_mise_en_service_incorrecte = pd.to_datetime(stations["date_mise_en_service"
 nb_date_mise_en_service_incorrecte = date_mise_en_service_incorrecte.isna().sum()
 print(f"nb_date_mise_en_service_incorrecte : ",nb_date_mise_en_service_incorrecte)
 
+
+

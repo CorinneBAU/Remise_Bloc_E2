@@ -21,12 +21,12 @@ class Station(Base):
     )
 
     nom: Mapped[str] = mapped_column(
-        String(30),
+        String(100),
         nullable=False,
     )
 
     commune: Mapped[str] = mapped_column(
-        String(30),
+        String(100),
         nullable=False,
     )
 
