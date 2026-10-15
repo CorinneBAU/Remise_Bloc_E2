@@ -6,3 +6,14 @@ message d'erreur en français en cas d'échec.
 
 Lancement : streamlit run front/app.py
 """
+import streamlit as st
+
+st.set_page_config(
+    page_title="VéloVille",
+)
+
+st.title("VéloVille")
+
+st.write(
+    "Application de consultation du réseau VéloVille"
+)
