@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers.stations import router as stations_router
 from api.routers.trajets import router as trajets_router
 from api.routers.incidents import router as incidents_router
+from api.routers.indicateurs import router as indicateurs_router
 
 
 app = FastAPI(
@@ -40,8 +41,8 @@ app.include_router(trajets_router)
 # # Routes CRUD pour incidents
 app.include_router(incidents_router)
 
-# # Routes d'analyse 
-# app.include_router(analyses_router)
+# # Routes pour les indicateurs 
+app.include_router(indicateurs_router)
 
 
 @app.get(
