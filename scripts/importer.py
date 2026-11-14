@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from api.database import SessionLocal
 from api.models import Station, Trajet, Incident
-from api.services.fiabilisation import station_referencee, duree_valide, normaliser_statut
+from api.services.fiabilisation import capacite_valide, date_coherente, normaliser_horodatage, normaliser_velo_id, station_referencee, duree_valide, normaliser_statut, statut_valide
 from sqlalchemy import text
 
 
@@ -24,9 +24,8 @@ FICHIER_INCIDENTS = "./data/incidents.csv"
 FICHIER_STATIONS = "./data/stations.csv"
 FICHIER_TRAJETS = "./data/trajets.csv"
 
-FICHIER_REJETS = "sorties/rejets_chargement.csv"
+FICHIER_REJETS = "sorties/journal_chargement.csv"
 
-# TAILLE_LOT = 500
 
 
 logging.basicConfig(
@@ -36,7 +35,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
+# Ecrire le ficher des rejets et des normalisations
 def ecrire_rejets(rejets: list[dict[str, Any]]) -> None:
     """Écrit les lignes rejetées dans un fichier CSV."""
 
@@ -72,7 +71,7 @@ def ecrire_rejets(rejets: list[dict[str, Any]]) -> None:
         writer.writeheader()
         writer.writerows(rejets)
 
-
+#  Alimenter le journal des anomalies
 def ajouter_anomalie(
     journal,
     fichier,
@@ -95,16 +94,15 @@ def ajouter_anomalie(
         "categorie": categorie
     })
 
+
 def main() -> None:
 
     debut_global = time.perf_counter()
 
-    rejets: list[dict[str, Any]] = []
+    journal_anomalies: list[dict[str, Any]] = []
     statistiques: list[dict[str, Any]] = []
 
-    logger.info("Début du chargement veloville.")
-
-    
+    logger.info("=== Début du chargement veloville ===")    
 
     stations = pd.read_csv(FICHIER_STATIONS)
     trajets = pd.read_csv(FICHIER_TRAJETS)
@@ -113,12 +111,10 @@ def main() -> None:
     db = SessionLocal()
 
     try:
-
         db.execute(text("DELETE FROM trajet"))
         db.execute(text("DELETE FROM incident"))
         db.execute(text("DELETE FROM station"))
-
-        # db.commit()
+       
 
         logger.info("Tables vidées")
 
@@ -132,7 +128,6 @@ def main() -> None:
         nb_stations_rejetees = 0
         nb_stations_doublons = 0
 
-        # for ligne in stations.to_dict("records"):
         for numero_ligne, ligne in enumerate(
             stations.to_dict("records"),
             start=2
@@ -141,7 +136,7 @@ def main() -> None:
             if ligne["station_id"] in stations_vues:
 
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="stations.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["station_id"],
@@ -157,16 +152,18 @@ def main() -> None:
                 continue
 
             # capacité non positive         
-            if ligne["capacite"] <= 0:
+            valide, motif = capacite_valide(
+                    ligne["capacite"])
 
+            if not valide:
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="stations.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["station_id"],
                     colonne="capacite",
                     valeur=ligne["capacite"],
-                    motif="capacité non positive",
+                    motif=motif,
                     decision="rejet"
                 )
 
@@ -176,7 +173,7 @@ def main() -> None:
             if pd.isna(ligne["nom"]) or str(ligne["nom"]).strip() == "":
 
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="stations.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["station_id"],
@@ -193,7 +190,7 @@ def main() -> None:
             if pd.isna(ligne["commune"]) or str(ligne["commune"]).strip() == "":
 
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="stations.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["station_id"],
@@ -204,7 +201,8 @@ def main() -> None:
                 )
 
                 nb_stations_rejetees += 1
-                continue
+                continue    
+           
 
             station = Station(
                 station_id=ligne["station_id"],
@@ -221,10 +219,11 @@ def main() -> None:
             stations_connues.add(ligne["station_id"])
                
             nb_stations_inserees += 1     
-        # db.commit()
+       
 
         logger.info("Import stations terminé")
-
+        db.flush()
+ 
         statistiques.append({
                 "table": "station",
                 "lues": len(stations),
@@ -232,10 +231,9 @@ def main() -> None:
                 "rejetees": nb_stations_rejetees,
                 "doublons": nb_stations_doublons,
                 "duree": 0,
-})
+            })
 
-        # stations_connues = set(stations["station_id"])
-
+       
 # Import du fichier trajets.csv
         logger.info(f"Trajets lues : {len(trajets)}")
 
@@ -245,25 +243,14 @@ def main() -> None:
         nb_trajets_rejetes = 0
         nb_trajets_doublons = 0
 
-        # for ligne in trajets.to_dict("records"):
         for numero_ligne, ligne in enumerate(
                 trajets.to_dict("records"),
                 start=2
-        ):
+            ):
 
-            if ligne["trajet_id"] in trajets_vus:
-                logger.warning(
-                    "REJET trajet %s : identifiant dupliqué",
-                    ligne["trajet_id"]
-                )
-                # rejet = {
-                #     "table": "trajet",
-                #     "trajet_id": ligne["trajet_id"],
-                #     "motif_rejet": "identifiant dupliqué"
-                # }
-                # rejets.append(rejet)
+            if ligne["trajet_id"] in trajets_vus:            
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="trajets.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["trajet_id"],
@@ -282,25 +269,48 @@ def main() -> None:
               ligne["trajet_id"]
             )
 
+            velo_id_normalise = normaliser_velo_id(
+                    ligne["velo_id"]
+                )
+
+            if velo_id_normalise != ligne["velo_id"]:
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="trajets.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["trajet_id"],
+                    colonne="velo_id",
+                    valeur=ligne["velo_id"],
+                    motif="normalisation velo_id",
+                    decision="normalisation"
+                )
+
+            depart_normalise = normaliser_horodatage(
+                ligne["depart_horodatage"]
+            )
+
             valide, motif = duree_valide(
                 ligne["duree_secondes"]
             )
 
-            if not valide:
-                logger.warning(
-                    "REJET trajet %s : %s",
-                    ligne["trajet_id"],
-                    motif
+            if pd.isna(depart_normalise):
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="trajets.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["trajet_id"],
+                    colonne="depart_horodatage",
+                    valeur=ligne["depart_horodatage"],
+                    motif="horodatage invalide",
+                    decision="rejet"
                 )
 
-                # rejets.append({
-                #     "table": "trajet",
-                #     "trajet_id": ligne["trajet_id"],
-                #     "motif_rejet": motif
-                #     })
+                nb_trajets_rejetes += 1
+                continue
 
+            if not valide:            
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="trajets.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["trajet_id"],
@@ -319,19 +329,8 @@ def main() -> None:
             )
 
             if not valide:
-                logger.warning(
-                    "REJET trajet %s : %s",
-                    ligne["trajet_id"],
-                    motif
-                )
-                # rejets.append({
-                #     "table": "trajet",
-                #     "trajet_id": ligne["trajet_id"],
-                #     "motif_rejet": motif
-                #     })
-
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="trajets.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["trajet_id"],
@@ -344,20 +343,14 @@ def main() -> None:
                 continue
 
             if pd.notna(ligne["station_arrivee"]):
-
                 valide, motif = station_referencee(
                 ligne["station_arrivee"],
                 stations_connues
-    )
+             )
 
-                if not valide:
-                  logger.warning(
-                    "REJET trajet %s : %s",
-                    ligne["trajet_id"],
-                    motif
-                  )
+                if not valide:               
                   ajouter_anomalie(
-                      rejets,
+                      journal_anomalies,
                       fichier="trajets.csv",
                       ligne=numero_ligne,
                       identifiant=ligne["trajet_id"],
@@ -369,10 +362,65 @@ def main() -> None:
                   nb_trajets_rejetes += 1
                   continue
 
+            if (
+                ligne["type_usager"] == "abonne"
+                and pd.isna(ligne["usager_ref"])
+            ):
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="trajets.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["trajet_id"],
+                    colonne="usager_ref",
+                    valeur=ligne["usager_ref"],
+                    motif="abonne sans usager_ref",
+                    decision="rejet"
+                )
+
+                nb_trajets_rejetes += 1
+                continue
+
+            if (
+                ligne["type_usager"] == "occasionnel"
+                and pd.notna(ligne["usager_ref"])
+            ):
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="trajets.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["trajet_id"],
+                    colonne="usager_ref",
+                    valeur=ligne["usager_ref"],
+                    motif="occasionnel avec usager_ref",
+                    decision="rejet"
+                )
+
+                nb_trajets_rejetes += 1
+                continue
+
+
+            if ligne["type_usager"] not in {
+                    "abonne",
+                    "occasionnel"
+                }:
+                    ajouter_anomalie(
+                        journal_anomalies,
+                        fichier="trajets.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["trajet_id"],
+                        colonne="type_usager",
+                        valeur=ligne["type_usager"],
+                        motif="type_usager invalide",
+                        decision="rejet"
+                    )
+
+                    nb_trajets_rejetes += 1
+                    continue
+                
             trajet = Trajet(
                 trajet_id=ligne["trajet_id"],
-                velo_id=ligne["velo_id"],
-                depart_horodatage=ligne["depart_horodatage"],
+                velo_id=velo_id_normalise,
+                depart_horodatage=depart_normalise,
                 station_depart=ligne["station_depart"],
                 station_arrivee=(None
                                  if pd.isna(ligne["station_arrivee"])
@@ -387,9 +435,9 @@ def main() -> None:
             db.add(trajet)
             nb_trajets_inseres += 1
 
-        # db.commit()
-
+      
         logger.info("Import trajets terminé")
+        db.flush()
 
         statistiques.append({
                  "table": "trajet",
@@ -399,6 +447,7 @@ def main() -> None:
                  "doublons": nb_trajets_doublons,
                  "duree": 0,
             })
+
 
 # Import du fichier incidents.csv
 
@@ -410,15 +459,14 @@ def main() -> None:
         nb_incidents_rejetes = 0
         nb_incidents_doublons = 0
 
-        # for ligne in incidents.to_dict("records"):
         for numero_ligne, ligne in enumerate(
                 incidents.to_dict("records"),
                 start=2
-        ):           
+            ):           
             if ligne["incident_id"] in incidents_vus:
 
                 ajouter_anomalie(
-                    rejets,
+                    journal_anomalies,
                     fichier="incidents.csv",
                     ligne=numero_ligne,
                     identifiant=ligne["incident_id"],
@@ -433,12 +481,165 @@ def main() -> None:
                 nb_incidents_doublons += 1
                 continue
 
+            if ligne["cible"] not in {"velo", "station"}:
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="incidents.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["incident_id"],
+                    colonne="cible",
+                    valeur=ligne["cible"],
+                    motif="cible invalide",
+                    decision="rejet"
+                )
+
+                nb_incidents_rejetes += 1
+                continue
+
+            if ligne["cible"] == "station":            
+                if pd.isna(ligne["station_id"]):
+                    ajouter_anomalie(
+                        journal_anomalies,
+                        fichier="incidents.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["incident_id"],
+                        colonne="station_id",
+                        valeur=ligne["station_id"],
+                        motif="station obligatoire pour cible station",
+                        decision="rejet"
+                    )
+
+                    nb_incidents_rejetes += 1
+                    continue
+
+            if ligne["cible"] == "station":
+                if pd.notna(ligne["velo_id"]):
+                    ajouter_anomalie(  
+                        journal_anomalies,
+                        fichier="incidents.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["incident_id"],
+                        colonne="velo_id",
+                        valeur=ligne["velo_id"],                                                  
+                        motif="velo_id interdit pour cible station",
+                        decision="rejet"
+                    )
+                    nb_incidents_rejetes += 1
+                    continue
+
+            if ligne["cible"] == "velo":
+                if pd.isna(ligne["velo_id"]):
+                    ajouter_anomalie(
+                        journal_anomalies,
+                        fichier="incidents.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["incident_id"],
+                        colonne="velo_id",
+                        valeur=ligne["velo_id"],
+                        motif="velo obligatoire pour cible velo",
+                        decision="rejet"
+                    )
+
+                    nb_incidents_rejetes += 1
+                    continue
+
+                if pd.notna(ligne["station_id"]):
+                    ajouter_anomalie(
+                        journal_anomalies,
+                        fichier="incidents.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["incident_id"],
+                        colonne="station_id",
+                        valeur=ligne["station_id"],
+                        motif="station_id interdit pour cible velo",
+                        decision="rejet"
+                    )
+
+                    nb_incidents_rejetes += 1
+                    continue
+
+            if pd.notna(ligne["station_id"]):
+                valide, motif = station_referencee(
+                    ligne["station_id"],
+                    stations_connues
+                    )
+            
+                if not valide:
+                    ajouter_anomalie(
+                        journal_anomalies,
+                        fichier="incidents.csv",
+                        ligne=numero_ligne,
+                        identifiant=ligne["incident_id"],
+                        colonne="station_id",
+                        valeur=ligne["station_id"],
+                        motif=motif,
+                        decision="rejet"
+                    )
+                    nb_incidents_rejetes += 1
+                    continue
+
+            valide, motif = date_coherente(
+                    pd.to_datetime(ligne["date_signalement"]),
+                    pd.to_datetime(ligne["date_resolution"])
+                    if pd.notna(ligne["date_resolution"])
+                    else None
+                )
+
+            if not valide:              
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="incidents.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["incident_id"],
+                    colonne="date_resolution",
+                    valeur=ligne["date_resolution"],
+                    motif=motif,
+                    decision="rejet"
+                )
+
+                nb_incidents_rejetes += 1
+                continue
+
+            statut_normalise = normaliser_statut(
+                ligne["statut"]
+            )
+            if statut_normalise != ligne["statut"]:
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="incidents.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["incident_id"],
+                    colonne="statut",
+                    valeur=ligne["statut"],
+                    motif="normalisation statut",
+                    decision="normalisation"
+                )
+
+            valide, motif = statut_valide(
+                statut_normalise
+            )
+
+            if not valide:           
+                ajouter_anomalie(
+                    journal_anomalies,
+                    fichier="incidents.csv",
+                    ligne=numero_ligne,
+                    identifiant=ligne["incident_id"],
+                    colonne="statut",
+                    valeur=ligne["statut"],
+                    motif=motif,
+                    decision="rejet"
+                )
+
+                nb_incidents_rejetes += 1
+                continue    
+
             incidents_vus.add(ligne["incident_id"])
 
             incident = Incident(
-               incident_id=ligne["incident_id"],
-               date_signalement=ligne["date_signalement"],
-               cible=ligne["cible"],
+                incident_id=ligne["incident_id"],
+                date_signalement=ligne["date_signalement"],
+                cible=ligne["cible"],
                 velo_id=(None
                         if pd.isna(ligne["velo_id"])
                         else ligne["velo_id"]
@@ -448,7 +649,7 @@ def main() -> None:
                             else ligne["station_id"]
                             ),
                 type_incident=ligne["type_incident"],
-                statut=normaliser_statut(ligne["statut"]),
+                statut=statut_normalise,
                 date_resolution=(None
                                 if pd.isna(ligne["date_resolution"])
                                 else ligne["date_resolution"]
@@ -459,6 +660,8 @@ def main() -> None:
                             ),  
                 )
 
+            
+            
             db.add(incident)
             nb_incidents_inseres += 1
 
@@ -478,8 +681,9 @@ def main() -> None:
     finally:
         db.close()
 
-    # raise NotImplementedError("À compléter")
-    ecrire_rejets(rejets)
+
+
+    ecrire_rejets(journal_anomalies)
     
     duree_globale = time.perf_counter() - debut_global
     
@@ -487,7 +691,7 @@ def main() -> None:
     
     for statistique in statistiques:
         logger.info(
-            "%s : lues=%d, insérées=%d, rejetées=%d, doublons=%d, durée=%.3f s",
+            "%s : lues=%d, insérées=%d, rejetées=%d (dont %d doublons), durée=%.3f s",
             statistique["table"],
             statistique["lues"],
             statistique["inserees"],
@@ -497,7 +701,7 @@ def main() -> None:
          )
     
     logger.info(
-        "Total : lues=%d | insérées=%d | rejetées=%d | doublons=%d | durée=%.3f s" ,
+        "Total : lues=%d | insérées=%d | rejetées=%d (dont %d doublons) | durée=%.3f s" ,
         sum(s["lues"] for s in statistiques),
         sum(s["inserees"] for s in statistiques),
         sum(s["rejetees"] for s in statistiques),
@@ -505,10 +709,24 @@ def main() -> None:
         duree_globale,
     )
     
-    if rejets:
-        logger.warning(
-            "%d ligne(s) rejetée(s). Voir %s.",
-            len(rejets),
+    if journal_anomalies:
+
+        nb_rejets = sum(
+            1
+            for ligne in journal_anomalies
+            if ligne["decision"] == "rejet"
+        )
+
+        nb_normalisations = sum(
+            1
+            for ligne in journal_anomalies
+            if ligne["decision"] == "normalisation"
+        )
+
+        logger.info(
+            "Journal généré : %d rejets(s) et %d normalisation(s). Voir %s.",
+            nb_rejets,
+            nb_normalisations,
             FICHIER_REJETS,
         )
     else:

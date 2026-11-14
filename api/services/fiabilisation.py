@@ -27,7 +27,7 @@ def normaliser_horodatage(horodatage: str) -> datetime | None:
     """ Convertit un horodatage dans un format date
     Retourne None si la valeur n'est pas convertible
     """
-    return pd.to_datetime(horodatage, errors="coerce")
+    return pd.to_datetime(horodatage, format="mixed", errors="coerce")
 
 def normaliser_velo_id(velo_id: str) -> str:
     """ Normalise un identifiant vélo sous le format "V" suivi de 4 chiffres
