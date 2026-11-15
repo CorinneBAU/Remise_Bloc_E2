@@ -6,11 +6,14 @@ PUT /incidents/{incident_id}/statut (rôle exploitant).
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Query
+from fastapi import HTTPException
+
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.schemas import IncidentOut, PageIncidentsOut
+from api.schemas import IncidentOut, PageIncidentsOut, ChangementStatutIn
 
 from api.models import Incident
 
@@ -55,3 +58,53 @@ def lire_incidents(
         "taille_page": taille_page,
         "resultats": incidents,
 }
+
+@router.put(
+    "/{incident_id}/statut",
+    response_model=IncidentOut,
+)
+def modifier_statut_incident(
+    incident_id: str,
+    changement: ChangementStatutIn,
+    db: Session = Depends(get_db),
+):
+    incident = (
+        db.query(Incident)
+        .filter(
+            Incident.incident_id == incident_id
+        )
+        .first()
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident introuvable",
+        )
+
+    transitions_autorisees = {
+        "ouvert": ["en_cours", "resolu"],
+        "en_cours": ["resolu"],
+        "resolu": [],
+    }
+
+    if changement.statut not in transitions_autorisees[
+        incident.statut
+    ]:
+        raise HTTPException(
+            status_code=422,
+            detail="Transition de statut non autorisee",
+        )
+
+    incident.statut = changement.statut
+
+    if (
+        changement.statut == "resolu"
+        and incident.date_resolution is None
+    ):
+        incident.date_resolution = datetime.now()
+
+    db.commit()
+    db.refresh(incident)
+
+    return incident
