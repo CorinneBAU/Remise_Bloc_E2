@@ -9,6 +9,8 @@ from fastapi import Depends
 
 from sqlalchemy.orm import Session
 
+from datetime import date
+
 from api.database import get_db
 from api.services.indicateurs import (
     activite_par_jour,
@@ -26,9 +28,15 @@ router = APIRouter(
     "/activite-par-jour"
 )
 def lire_activite_par_jour(
+    date_debut: date | None = None,
+    date_fin: date | None = None,
     db: Session = Depends(get_db),
 ):
-    return activite_par_jour(db)
+    return activite_par_jour(
+        db, 
+        date_debut=date_debut, 
+        date_fin=date_fin
+    )
 
 # @router.get(
 #     "/activite-par-jour"
@@ -47,9 +55,13 @@ def lire_activite_par_jour(
     "/stations-actives"
 )
 def lire_stations_actives(
+    limite: int = 10,
     db: Session = Depends(get_db),
 ):
-    return stations_actives(db)
+    return stations_actives(
+        db, 
+        limite=limite
+    )
 
 
 @router.get(
