@@ -104,3 +104,30 @@ class LoginOut(BaseModel):
     role: str
 
 
+# ============================================================
+# Indicateurs
+# ============================================================
+
+class ActiviteJourOut(BaseModel):
+    jour: str
+    nb_trajets: int
+
+class ActiviteParJourResponse(BaseModel):
+    donnees: list[ActiviteJourOut]
+
+class StationActiveOut(BaseModel):
+    station_id: str
+    nom: str
+    nb_departs: int
+    nb_arrivees: int
+
+class StationsActivesResponse(BaseModel):
+    donnees: list[StationActiveOut]
+
+class IncidentStatutOut(BaseModel):
+    statut: str
+    nb_incidents: int
+
+class IncidentsParStatutResponse(BaseModel):
+    donnees: list[IncidentStatutOut]
+    delai_moyen_resolution_heures: float | None
