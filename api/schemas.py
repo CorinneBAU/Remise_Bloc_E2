@@ -65,3 +65,24 @@ class IncidentOut(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class ChangementStatutIn(BaseModel):
+    statut: str
+    
+
+# ============================================================
+# Authentification
+# ============================================================
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class LoginOut(BaseModel):
+    access_token: str
+    token_type: str
+    role: str
+
+
