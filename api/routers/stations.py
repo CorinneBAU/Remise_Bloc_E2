@@ -5,12 +5,13 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi import Depends
+from fastapi import Query
 
 from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import Station
-from api.schemas import StationOut
+from api.schemas import PageStationsOut, StationOut
 
 router = APIRouter(
     prefix="/stations",
@@ -20,12 +21,37 @@ router = APIRouter(
 
 @router.get(
     "",
-    response_model=list[StationOut],
+    # response_model=list[StationOut],
+    response_model=PageStationsOut,
 )
 def lire_stations(
+    commune: str | None = None,
+    page: int = Query(1, ge=1),
+    taille_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    return db.query(Station).all()
+    requete = db.query(Station)
+    if commune:
+        requete = requete.filter(
+            Station.commune == commune
+        )
+
+    total = requete.count()
+
+    stations = (
+    requete
+    .order_by(Station.station_id)
+    .offset((page - 1) * taille_page)
+    .limit(taille_page)
+    .all()
+)
+    
+    return {
+    "total": total,
+    "page": page,
+    "taille_page": taille_page,
+    "resultats": stations,
+}
 
 @router.get(
     "/{station_id}",

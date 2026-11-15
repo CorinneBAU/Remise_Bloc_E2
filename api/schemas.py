@@ -27,6 +27,12 @@ class StationOut(BaseModel):
         from_attributes=True,
     )
 
+class PageStationsOut(BaseModel):
+    total: int
+    page: int
+    taille_page: int
+    resultats: list[StationOut]
+
 
 # ============================================================
 # Trajets
@@ -45,6 +51,12 @@ class TrajetOut(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+class PageTrajetsOut(BaseModel):
+    total: int
+    page: int
+    taille_page: int
+    resultats: list[TrajetOut]
 
 
 # ============================================================
@@ -69,7 +81,13 @@ class IncidentOut(BaseModel):
 
 class ChangementStatutIn(BaseModel):
     statut: str
-    
+
+class PageIncidentsOut(BaseModel):
+    total: int
+    page: int
+    taille_page: int
+    resultats: list[IncidentOut]
+
 
 # ============================================================
 # Authentification
