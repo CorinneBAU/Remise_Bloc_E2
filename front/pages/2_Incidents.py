@@ -10,7 +10,12 @@ from api_client import lister_incidents
 
 st.title("Incidents")
 
-incidents = lister_incidents()
+reponse = lister_incidents()
+incidents = reponse["resultats"]
+
+st.write(
+    f"{reponse['total']} incidents"
+)
 
 st.dataframe(
     pd.DataFrame(incidents),

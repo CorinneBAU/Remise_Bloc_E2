@@ -23,10 +23,41 @@ def _get(endpoint: str):
         return response.json()
 
     except requests.RequestException as e:
-        raise ErreurApi(str(e))
+        # raise ErreurApi(str(e))
+        raise ErreurApi(
+            "Une erreur de communication est survenue."
+        )
+    except requests.Timeout:
+        raise ErreurApi(
+            "Le serveur met trop de temps à répondre."
+        )
+
+    except requests.ConnectionError:
+        raise ErreurApi(
+            "Impossible de joindre l'API VéloVille."
+        )
+
+    except requests.HTTPError:
+        raise ErreurApi(
+            f"Erreur de l'API ({response.status_code})."
+        )
     
-def lister_stations():
-    return _get("/stations")
+def lister_stations(
+    commune=None,
+    page=1,
+    taille_page=20,
+):
+    params = []
+
+    if commune:
+        params.append(f"commune={commune}")
+
+    params.append(f"page={page}")
+    params.append(f"taille_page={taille_page}")
+
+    query = "&".join(params)
+
+    return _get(f"/stations?{query}")
 
 def lister_trajets():
     return _get("/trajets")
