@@ -13,7 +13,7 @@ from api.routers.stations import router as stations_router
 from api.routers.trajets import router as trajets_router
 from api.routers.incidents import router as incidents_router
 from api.routers.indicateurs import router as indicateurs_router
-# from api.routers.auth import router as auth_router
+from api.routers.auth import router as auth_router
 
 
 app = FastAPI(
@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 # Route pour l'authentification des utilisateurs
-# app.include_router(auth_router)
+app.include_router(auth_router)
 
 # Route CRUD pour stations
 app.include_router(stations_router)
