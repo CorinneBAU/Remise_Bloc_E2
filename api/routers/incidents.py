@@ -16,6 +16,8 @@ from api.database import get_db
 from api.schemas import IncidentOut, PageIncidentsOut, ChangementStatutIn
 
 from api.models import Incident
+from api.securite import exiger_role
+
 
 router = APIRouter(
     prefix="/incidents",
@@ -62,6 +64,9 @@ def lire_incidents(
 @router.put(
     "/{incident_id}/statut",
     response_model=IncidentOut,
+    dependencies=[
+        Depends(exiger_role("exploitant"))
+    ],
 )
 def modifier_statut_incident(
     incident_id: str,

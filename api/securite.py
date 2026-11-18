@@ -11,6 +11,15 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+)
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
+from api.database import get_db
+from api.models import Utilisateur
 from dotenv import load_dotenv
 
 
@@ -22,7 +31,11 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_MINUTES = int(
     os.getenv("JWT_EXPIRATION_MINUTES", "60")
 )
-print("JWT_SECRET =", repr(JWT_SECRET))
+
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+)
+
 
 def verifier_mot_de_passe(
     mot_de_passe_clair: str,
@@ -68,3 +81,68 @@ def decoder_access_token(
         JWT_SECRET,
         algorithms=[JWT_ALGORITHM],
     )
+
+def utilisateur_courant(
+    creds: HTTPAuthorizationCredentials | None =
+    Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Utilisateur:
+
+    if creds is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentification requise",
+        )
+
+    try:
+        payload = decoder_access_token(
+            creds.credentials
+        )
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token expiré",
+        )
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token invalide",
+        )
+
+    utilisateur = (
+        db.query(Utilisateur)
+        .filter(
+            Utilisateur.username
+            == payload["sub"]
+        )
+        .first()
+    )
+
+    if utilisateur is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Utilisateur inconnu",
+        )
+
+    return utilisateur
+
+
+def exiger_role(role_attendu: str):
+
+    def verifier(
+        utilisateur: Utilisateur = Depends(
+            utilisateur_courant
+        ),
+    ) -> Utilisateur:
+
+        if utilisateur.role != role_attendu:
+            raise HTTPException(
+                status_code=403,
+                detail="Role non autorise",
+            )
+
+        return utilisateur
+
+    return verifier
