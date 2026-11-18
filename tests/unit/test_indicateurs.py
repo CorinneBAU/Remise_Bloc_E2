@@ -15,6 +15,10 @@ def test_sante(client):
     assert response.json() == {
         "statut": "ok"
     }
+# Test de départ pour vérifier la connextion avec la base de test veloville_test
+def test_base_de_test_est_vide(db_session):
+    assert db_session.query(Incident).count() == 0
+
 
 def test_incidents_par_statut_calcule_delai_moyen(
     db_session,
