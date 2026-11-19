@@ -261,6 +261,15 @@ Résultats obtenus :
 
 L'objectif fixé dans le sujet est atteint (couverture supérieure ou égale à 60 %).
 
+#### Vérifications réalisées
+
+Les contrôles suivants ont été réalisés manuellement via Swagger :
+- GET/sante répond {"statut":"ok"}
+- POST/auth/login avec 'exploitant01' renvoie un JWT valide
+- Appel d'une route protégée sans jeton renvoie 401 Unauthorized
+
+
+
 ## Choix écoresponsables
 #### Pagination côté serveur
 
