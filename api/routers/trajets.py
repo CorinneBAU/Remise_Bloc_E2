@@ -14,10 +14,15 @@ from datetime import date
 from api.database import get_db
 from api.schemas import TrajetOut, PageTrajetsOut
 from api.models import Trajet
+from api.securite import utilisateur_courant
+
 
 router = APIRouter(
     prefix="/trajets",
     tags=["trajets"],
+    dependencies=[
+        Depends(utilisateur_courant)
+    ],
 )
 
 

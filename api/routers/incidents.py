@@ -17,11 +17,16 @@ from api.schemas import IncidentOut, PageIncidentsOut, ChangementStatutIn
 
 from api.models import Incident
 from api.securite import exiger_role
+from api.securite import utilisateur_courant
+
 
 
 router = APIRouter(
     prefix="/incidents",
     tags=["incidents"],
+    dependencies=[
+            Depends(utilisateur_courant)
+        ],
 )
 
 

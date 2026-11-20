@@ -12,10 +12,14 @@ from sqlalchemy.orm import Session
 from api.database import get_db
 from api.models import Station
 from api.schemas import PageStationsOut, StationOut
+from api.securite import utilisateur_courant
 
 router = APIRouter(
     prefix="/stations",
     tags=["stations"],
+    dependencies=[
+        Depends(utilisateur_courant)
+    ],
 )
 
 
